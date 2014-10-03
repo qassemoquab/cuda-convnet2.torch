@@ -1,16 +1,16 @@
 local C = ccn2.C
 
-local SpatialConvolution, parent = torch.class('ccn2.SpatialConvolution', 'nn.Module')
+local SpatialConvolutionRGB, parent = torch.class('ccn2.SpatialConvolutionRGB', 'nn.Module')
 
-function SpatialConvolution:__init(nInputPlane, nOutputPlane, kH, dH, padding, groups)
+function SpatialConvolutionRGB:__init(nInputPlane, nOutputPlane, kH, dH, padding, groups)
    parent.__init(self)
 
    dH = dH or 1 -- stride
    padding = padding or 0
    groups = groups or 1
 
-   if not (nInputPlane >= 1 and (nInputPlane <= 3 or math.fmod(nInputPlane, 4) == 0)) then
-      error('Assertion failed: [(nInputPlane >= 1 and (nInputPlane <= 3 or math.fmod(nInputPlane, 4)))]. Number of input channels has to be 1, 2, 3 or a multiple of 4')
+   if not (nInputPlane == 3) then
+      error('Assertion failed: nInputPlane == 3')
    end
    if math.fmod(nOutputPlane, 16) ~= 0 then
       error('Assertion failed: [math.fmod(nOutputPlane, 16) == 0]. Number of output planes has to be a multiple of 16.')
@@ -25,6 +25,7 @@ function SpatialConvolution:__init(nInputPlane, nOutputPlane, kH, dH, padding, g
 
    self.weight = torch.Tensor(nInputPlane*kH*kH/groups, nOutputPlane)
    self.bias = torch.Tensor(nOutputPlane)
+   self.gradWeightTmp = torch.Tensor(64*nInputPlane*kH*kH/groups, nOutputPlane):zero()
    self.gradWeight = torch.Tensor(nInputPlane*kH*kH/groups, nOutputPlane)
    self.gradBias = torch.Tensor(nOutputPlane)
 
@@ -35,7 +36,7 @@ function SpatialConvolution:__init(nInputPlane, nOutputPlane, kH, dH, padding, g
    self:cuda()
 end
 
-function SpatialConvolution:reset(stdv)
+function SpatialConvolutionRGB:reset(stdv)
    if stdv then
       stdv = stdv * math.sqrt(3)
    else
@@ -45,7 +46,7 @@ function SpatialConvolution:reset(stdv)
    self.bias:uniform(-stdv, stdv)   
 end
 
-function SpatialConvolution:updateOutput(input)
+function SpatialConvolutionRGB:updateOutput(input)
    ccn2.typecheck(input)
    ccn2.inputcheck(input)
    local nBatch = input:size(4)
@@ -65,7 +66,7 @@ function SpatialConvolution:updateOutput(input)
    return self.output
 end
 
-function SpatialConvolution:updateGradInput(input, gradOutput)
+function SpatialConvolutionRGB:updateGradInput(input, gradOutput)
    ccn2.typecheck(input); ccn2.typecheck(gradOutput); 
    ccn2.inputcheck(input); ccn2.inputcheck(gradOutput);
    local oH = gradOutput:size(2); 
@@ -82,7 +83,7 @@ function SpatialConvolution:updateGradInput(input, gradOutput)
    return self.gradInput
 end
 
-function SpatialConvolution:accGradParameters(input, gradOutput, scale)
+function SpatialConvolutionRGB:accGradParameters(input, gradOutput, scale)
    scale = scale or 1
    ccn2.typecheck(input); ccn2.typecheck(gradOutput); 
    ccn2.inputcheck(input); ccn2.inputcheck(gradOutput);
@@ -91,10 +92,13 @@ function SpatialConvolution:accGradParameters(input, gradOutput, scale)
    local nBatch = input:size(4)
    local inputC = input:view(input:size(1) * input:size(2) * input:size(3), input:size(4))
    local gradOutputC = gradOutput:view(gradOutput:size(1) * gradOutput:size(2) * gradOutput:size(3), gradOutput:size(4))
-   local sumWidth = oH
-   C['convWeightActsSt'](inputC:cdata(), gradOutputC:cdata(), self.gradWeight:cdata(),
+   local sumWidth = math.ceil(oH/8)
+   C['convWeightActsSt'](inputC:cdata(), gradOutputC:cdata(), self.gradWeightTmp:cdata(),
                          iH, oH, oH, self.kH, 
                             -self.padding, self.dH, self.nInputPlane, self.groups, sumWidth, 0, scale);
+   for i=1,self.gradWeightTmp:size(1)/self.gradWeight:size(1) do
+      self.gradWeight:add(self.gradWeightTmp:narrow(1, (i-1)*self.gradWeight:size(1)+1, self.gradWeight:size(1) ))
+   end
    gradOutputC = gradOutput:view(self.nOutputPlane, oH * oH * nBatch)
    C['gradBias'](gradOutputC:cdata(), self.gradBias:cdata(), scale);   
 end
