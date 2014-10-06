@@ -16,7 +16,7 @@ function SpatialCrossResponseNormalization:__init(size, addScale, powScale, minD
   self.output = torch.Tensor()
   self.gradInput = torch.Tensor()
   
-  self:cuda()
+--  self:cuda()
 end
 
 

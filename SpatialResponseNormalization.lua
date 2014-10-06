@@ -17,7 +17,7 @@ function SpatialResponseNormalization:__init(size, addScale, powScale, minDiv)
   self.gradInput = torch.Tensor()
   self.denoms = torch.Tensor()
 
-  self:cuda()
+--  self:cuda()
 end
 
 

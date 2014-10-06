@@ -11,7 +11,7 @@ function SpatialCrossMaxPooling:__init(kD, dD)
   self.output = torch.Tensor()
   self.gradInput = torch.Tensor()
   
-  self:cuda()
+--  self:cuda()
 end
 
 function SpatialCrossMaxPooling:updateOutput(input)

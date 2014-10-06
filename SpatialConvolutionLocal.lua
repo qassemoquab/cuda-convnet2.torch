@@ -34,7 +34,7 @@ function SpatialConvolutionLocal:__init(nInputPlane, nOutputPlane, iH, kH, dH, p
    self.output = torch.Tensor()
 
    self:reset()
-   self:cuda()
+--   self:cuda()
 end
 
 function SpatialConvolutionLocal:reset(stdv)

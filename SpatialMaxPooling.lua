@@ -11,7 +11,7 @@ function SpatialMaxPooling:__init(kW, dW)
   self.output = torch.Tensor()
   self.gradInput = torch.Tensor()
   
-  self:cuda()
+--  self:cuda()
 end
 
 function SpatialMaxPooling:updateOutput(input)

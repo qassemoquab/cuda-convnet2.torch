@@ -32,7 +32,7 @@ function SpatialConvolution:__init(nInputPlane, nOutputPlane, kH, dH, padding, g
    self.output = torch.Tensor()
 
    self:reset()
-   self:cuda()
+--   self:cuda()
 end
 
 function SpatialConvolution:reset(stdv)
